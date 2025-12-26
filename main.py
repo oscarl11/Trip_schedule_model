@@ -261,16 +261,17 @@ if st.button("Generar jornadas"):
     )
     st.dataframe(st.session_state.df_jornada_regular.head(20))
 
-'''
-st.graphviz_chart('''
-    digraph {
-        Inicio -> Subida_de_archivo
-        Subida_de_archivo -> Identificación_de_relevos
-        Identificación_de_relevos -> Iteración_de_tramos
-        Iteración_de_tramos -> Formación_de_jornadas
-        Formación_de_jornadas -> Selección_de_jornadas
-        Selección_de_jornadas -> Fin                            
-    }
-''')
-'''
+
+#st.graphviz_chart('''
+#    digraph {
+#        Inicio -> Subida_de_archivo
+#        Subida_de_archivo -> Identificación_de_relevos
+#        Identificación_de_relevos -> Iteración_de_tramos
+#        Iteración_de_tramos -> Formación_de_jornadas
+#        Formación_de_jornadas -> Selección_de_jornadas
+#        Selección_de_jornadas -> Fin                            
+#    }
+#''')
+
+
 
