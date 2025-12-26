@@ -1,8 +1,5 @@
 streamlit
 pandas
 numpy
-itertools
-datetime
-matplotlib.pyplot
+matplotlib
 pulp
-ast
