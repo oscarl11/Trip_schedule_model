@@ -212,14 +212,14 @@ tmin_jornada = pd.Timedelta(
 #------------------------------------------------------------------------------------------
 
 Tmax_jornada_h = st.number_input(
-    "Duración máxima tramo (horas)",
+    "Duración máxima jornada (horas)",
     min_value=0,
     max_value=24,
     value=9
 )
 
 Tmax_jornada_m = st.number_input(
-    "Duración máxima tramo (minutos)",
+    "Duración máxima jornada (minutos)",
     min_value=0,
     max_value=59,
     value=11
@@ -260,6 +260,7 @@ if st.button("Generar jornadas"):
         key='download-csv'
     )
     st.dataframe(st.session_state.df_jornada_regular.head(20))
+
 
 
 
