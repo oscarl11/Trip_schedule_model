@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
-import graphviz as graphviz
+#import graphviz as graphviz
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from itertools import combinations
@@ -261,7 +261,7 @@ if st.button("Generar jornadas"):
     )
     st.dataframe(st.session_state.df_jornada_regular.head(20))
 
-
+'''
 st.graphviz_chart('''
     digraph {
         Inicio -> Subida_de_archivo
@@ -272,4 +272,5 @@ st.graphviz_chart('''
         Selección_de_jornadas -> Fin                            
     }
 ''')
+'''
 
