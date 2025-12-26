@@ -1,0 +1,8 @@
+streamlit
+pandas
+numpy
+itertools
+datetime
+matplotlib.pyplot
+pulp
+ast
