@@ -6,7 +6,7 @@ import pulp
 import ast
 
 #Iteración de tramos de trabajo
-def form_tramos(df,tmin,tmax):
+def form_tramos(df,tmin,tmax,lista_estaciones):
     # Lista para guardar las combinaciones válidas
     combinaciones_validas = []
 
@@ -17,7 +17,11 @@ def form_tramos(df,tmin,tmax):
         for i, j in combinations(grupo.index, 2):
             t1 = grupo.loc[i, "hora_ro"]
             t2 = grupo.loc[j, "hora_ro"]
-            diff = t2 - t1
+            if grupo.loc[i,"estacion_ro"] != "PNOR" and grupo.loc[i,"estacion_ro"] in (lista_estaciones['estaciones']): 
+                relevo=timedelta(hours=0,minutes=4)
+            else: relevo = timedelta(0)
+            diff = t2 - t1- relevo
+            
 
             if tmin <= diff <= tmax:
                 combinaciones_validas.append({
