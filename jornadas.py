@@ -37,11 +37,15 @@ def jornadas_regular_eq_est (df,tmin_jornada,tmax_jornada,tmin_alm,tmax_alm):
                     "estacion_inicio_1": fila_i["estacion_inicio"],
                     "hora_fin_1": fila_i["hora_fin"],
                     "estacion_fin_1": fila_i["estacion_fin"],
+                    "dur_tramo_1":fila_i["hora_fin"]-fila_i["hora_inicio"],
+
                     "CC_2": fila_j["CC"],
                     "hora_inicio_2": fila_j["hora_inicio"],
                     "estacion_inicio_2": fila_j["estacion_inicio"],
                     "hora_fin_2": fila_j["hora_fin"],
                     "estacion_fin_2": fila_j["estacion_fin"],
+                    "dur_tramo_2":fila_j["hora_fin"]-fila_j["hora_inicio"],
+
                     "espera_entre_tramos": diff_espera,
                     "duracion_total": duracion_total,
                     "lista_id_viaje":fila_i["lista_id_viaje"]+fila_j["lista_id_viaje"]
@@ -53,10 +57,12 @@ def jornadas_regular_eq_est (df,tmin_jornada,tmax_jornada,tmin_alm,tmax_alm):
     return df_jorn_eq_regular
 
 #Formación de Jornadas turno partido
-max_hora_partido=timedelta(hours=22,minutes=30)
+#max_hora_partido=timedelta(hours=22,minutes=30)
 
 def jornadas_partido_eq_est (df,tmin_part,tmax_part,max_hora_partido):
-    df_combinaciones = df[df["hora_fin"]<max_hora_partido]
+    fecha_base = df["hora_fin"].dt.date.min()
+    limite_dt = datetime.combine(fecha_base, max_hora_partido)
+    df_combinaciones = df[df["hora_fin"]<limite_dt]
     df_combinaciones_partido = df_combinaciones.sort_values("hora_inicio").reset_index(drop=True)
 
     resultados_filtro_avanzado = []
@@ -99,12 +105,14 @@ def jornadas_partido_eq_est (df,tmin_part,tmax_part,max_hora_partido):
                 "estacion_inicio_1": tramo_a["estacion_inicio"],
                 "hora_fin_1": tramo_a["hora_fin"],
                 "estacion_fin_1": tramo_a["estacion_fin"],
+                "dur_tramo_1": tramo_a["hora_fin"]-tramo_a["hora_inicio"],
 
                 "CC_2": tramo_b["CC"],
                 "hora_inicio_2": tramo_b["hora_inicio"],
                 "estacion_inicio_2": tramo_b["estacion_inicio"],
                 "hora_fin_2": tramo_b["hora_fin"],
                 "estacion_fin_2": tramo_b["estacion_fin"],
+                "dur_tramo_2": tramo_b["hora_fin"]-tramo_b["hora_inicio"],
 
                 "espera_entre_tramos": lapso_descanso,
                 "duracion_total": tiempo_total,
@@ -173,18 +181,21 @@ def jornadas_regular_diff_est (df_combinaciones,traslados_validos,ESPERA_MIN,ESP
                             "estacion_inicio_1": t1["estacion_inicio"],
                             "hora_fin_1": t1["hora_fin"],
                             "estacion_fin_1": est_fin_1,
+                            "dur_tramo_1": t1["hora_fin"]-t1["hora_inicio"],
 
                             "CC_2": t2["CC"],
                             "hora_inicio_2": nuevo_inicio_2,
                             "estacion_inicio_2": est_fin_1,
                             "hora_fin_2": t2["hora_fin"],
                             "estacion_fin_2": t2["estacion_fin"],
+                            "dur_tramo_2": t2["hora_fin"]-nuevo_inicio_2,
 
                             "tipo_ajuste": "adelantar_2",
                             "traslado": traslado,
-                            "espera_total": espera_total,
+                            "espera_entre_tramos": espera_total,
                             "duracion_total": duracion_total,
-                            "lista_id_viaje": t1["lista_id_viaje"] + t2["lista_id_viaje"]
+                            "lista_id_viaje": t1["lista_id_viaje"] + t2["lista_id_viaje"],
+                            "tipo_turno":"Regular adelantar_2"
                         })
 
             # ==================================================
@@ -212,20 +223,68 @@ def jornadas_regular_diff_est (df_combinaciones,traslados_validos,ESPERA_MIN,ESP
                             "estacion_inicio_1": t1["estacion_inicio"],
                             "hora_fin_1": nuevo_fin_1,
                             "estacion_fin_1": est_ini_2,
+                            "dur_tramo_1": nuevo_fin_1-t1["hora_inicio"],
 
                             "CC_2": t2["CC"],
                             "hora_inicio_2": t2["hora_inicio"],
                             "estacion_inicio_2": est_ini_2,
                             "hora_fin_2": t2["hora_fin"],
                             "estacion_fin_2": t2["estacion_fin"],
+                            "dur_tramo_2": t2["hora_fin"]-t2["hora_inicio"],
 
                             "tipo_ajuste": "extender_1",
                             "traslado": traslado,
                             "espera_entre_tramos": espera_total,
                             "duracion_total": duracion_total,
-                            "lista_id_viaje": t1["lista_id_viaje"] + t2["lista_id_viaje"]
+                            "lista_id_viaje": t1["lista_id_viaje"] + t2["lista_id_viaje"],
+                            "tipo_turno":"Regular extender_1"
                         })
 
     df_empalmes_diff = pd.DataFrame(resultados)
 
     return df_empalmes_diff
+'''
+def correct_ini(df,traslado_inicio):
+    df=df.copy()
+    correct_jornadas=pd.DataFrame()
+    for i in range(len(df)-1):
+        jorn=df.loc[i].copy()
+        est_ini=jorn['estacion_inicio_1']
+        hora_ini=jorn['hora_inicio_1']
+        
+        if est_ini not in traslado_inicio['est_ini_2']:
+            continue
+        traslado_info = traslado_inicio[traslado_inicio['est_ini_2']==est_ini]
+        traslado = traslado_info["tiempo"]
+
+        #nuevo_inicio_1= jorn['hora_inicio_1']-traslado
+        nuevo_est_ini=traslado_info['est_ini_1']
+
+        jorn['hora_inicio_1']=jorn['hora_inicio_1']-traslado
+        jorn['estacion_inicio_1']=nuevo_est_ini
+
+        correct_jornadas.append(jorn)
+
+    return correct_jornadas
+
+'''
+def correct_ini(df, traslados_validos_ini):
+    for idx in range(len(df)):
+        est_actual = df.loc[idx, "estacion_inicio_1"]
+
+        # Buscar coincidencia en claves de traslado de inicio
+        for (est_ini_1, est_ini_2), info in traslados_validos_ini.items():
+            if est_actual == est_ini_2:
+                traslado = info["tiempo"]
+
+                # Ajustar inicio y estación en el mismo df
+                df.at[idx, "hora_inicio_1"] = df.loc[idx, "hora_inicio_1"] - traslado
+                df.at[idx, "estacion_inicio_1"] = est_ini_1
+
+                # Aumentar duración total de la jornada
+                df.at[idx, "duracion_total"] = df.loc[idx, "duracion_total"] + traslado
+                df.at[idx, "dur_tramo_1"] = df.loc[idx, "dur_tramo_1"] + traslado
+                break
+
+    return df
+
