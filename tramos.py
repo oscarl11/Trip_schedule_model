@@ -50,3 +50,12 @@ def generar_lista_ids(row):
         lista.insert(0, inicio)
 
     return lista
+
+#Descartar tramos que tengan totalmente incluido los horarios límites de almuerzo
+def sel_tramo_incl_Talm(df,Talm_min,Talm_max):
+    fecha_base=df["hora_inicio"].dt.date.min()
+    limite_min = datetime.combine(fecha_base, Talm_min)
+    limite_max = datetime.combine(fecha_base, Talm_max)
+    df_subconj_lim_alm=df[(df['hora_inicio']<limite_min) &(df['hora_fin']>limite_max)]
+    df_extr_alm=df[~df['lista_id_viaje'].isin(df_subconj_lim_alm['lista_id_viaje'])]
+    return df_extr_alm
