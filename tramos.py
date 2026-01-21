@@ -58,4 +58,5 @@ def sel_tramo_incl_Talm(df,Talm_min,Talm_max):
     limite_max = datetime.combine(fecha_base, Talm_max)
     df_subconj_lim_alm=df[(df['hora_inicio']<limite_min) &(df['hora_fin']>limite_max)]
     df_extr_alm=df[~df['lista_id_viaje'].isin(df_subconj_lim_alm['lista_id_viaje'])]
-    return df_extr_alm
+    df_excl_alm=df[df['lista_id_viaje'].isin(df_subconj_lim_alm['lista_id_viaje'])]
+    return df_extr_alm,df_excl_alm
