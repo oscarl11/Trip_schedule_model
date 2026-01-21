@@ -26,6 +26,9 @@ if "estaciones" not in st.session_state:
 if "df_lista_ro" not in st.session_state:
     st.session_state.df_lista_ro = None
 
+if "df_excl_alm" not in st.session_state:
+    st.session_state.df_excl_alm = None
+
 if "df_tramos" not in st.session_state:
     st.session_state.df_tramos = None
 if "df_jornada_partida" not in st.session_state:
@@ -71,6 +74,16 @@ if format_POD is not None:
     st.write(f"Dimensiones del DataFrame: {df.shape[0]} filas, {df.shape[1]} columnas")
 else:
     st.info("Por favor, sube un archivo CSV con la programación para empezar.")
+
+#Generación de la lista con los id_viaje
+
+if st.session_state.df_pod is not None:
+    st.session_state.lista_ids_viaje = (
+        st.session_state.df_pod[['id_viaje']]
+        .drop_duplicates()
+        .reset_index(drop=True)
+    )
+
 
 #ACONDICIONAMIENTO DE ARCHIVO + EXTRACCIÓN DE RO
 
@@ -234,11 +247,15 @@ if st.button("Generar tramos"):
         lista_estaciones=st.session_state.estaciones
     )
     df_tramos['lista_id_viaje']=df_tramos.apply(generar_lista_ids,axis=1)
-    df_tramos_2=sel_tramo_incl_Talm(
+    df_tramos_2,df_excl_tramo=sel_tramo_incl_Talm(
         df=df_tramos,
         Talm_min=Tlim_alm_min,
+
+
+
         Talm_max=Tlim_alm_max
     )
+    st.session_state.df_excl_alm=df_excl_tramo
     st.session_state.df_tramos=df_tramos_2
     csv_tramos=st.session_state.df_tramos.to_csv(index=False).encode('utf-8')
     st.download_button(
@@ -515,11 +532,6 @@ if st.button("Generar jornadas"):
 
     st.dataframe(st.session_state.df_jornada_total.head(50))
 
-st.session_state.lista_ids_viaje = (
-    st.session_state.df_pod[['id_viaje']]
-    .drop_duplicates()
-    .reset_index(drop=True)
-)
 
 if st.button("Optimizar jornadas (Set Covering)"):
 
@@ -554,7 +566,6 @@ if st.button("Optimizar jornadas (Set Covering)"):
         )
 
         st.dataframe(resultado["df_solucion"].head(50))
-
 
 
 
