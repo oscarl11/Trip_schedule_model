@@ -106,3 +106,106 @@ def set_covering4schedule(
             "viajes_sin_cubrir": viajes_sin_cubrir,
             "n_jornadas_seleccionadas": 0
         }
+    
+
+def calcular_weight(jornada, params):
+    costo = params["costo_base"]
+
+    duracion_h = jornada["duracion_total"].total_seconds() / 3600
+
+    if jornada["tipo_turno"] == "Partido":
+        costo += params["penal_turno_partido"]
+        duracion_obj = params["duracion_obj_partido"]
+    else:
+        costo += params["penal_turno_regular"]
+        duracion_obj = params["duracion_obj_regular"]
+
+    # Penalización por desviación absoluta
+    costo += params["lambda_desviacion"] * abs(duracion_h - duracion_obj)
+
+    return costo
+
+def set_weights4schedule(
+        df_id_viajes: pd.DataFrame,
+        df_jornadas: pd.DataFrame,
+        solver_msg: bool = False):
+    
+
+    df = df_jornadas.copy()
+
+    # -------------------------------------------------------
+    # 1. Normalizar lista_id_viaje
+    # -------------------------------------------------------
+    df["lista_id_viaje"] = df["lista_id_viaje"].apply(
+        lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+    )
+
+    # Universo de viajes
+    U = set(df_id_viajes["id_viaje"].unique())
+    J = df.index.tolist()
+
+    # -------------------------------------------------------
+    # 2. Modelo
+    # -------------------------------------------------------
+    model = pulp.LpProblem("SetPartitioning_Jornadas", pulp.LpMinimize)
+
+    x = pulp.LpVariable.dicts("x", J, cat="Binary")
+
+    # Objetivo
+    model += pulp.lpSum(
+        df.loc[j, "weight"] * x[j] for j in J
+    )
+
+    # -------------------------------------------------------
+    # 3. Restricciones
+    # -------------------------------------------------------
+    viajes_sin_cobertura_previa = []
+
+    for v in U:
+        jornadas_que_cubren = [j for j in J if v in df.loc[j, "lista_id_viaje"]]
+
+        if not jornadas_que_cubren:
+            viajes_sin_cobertura_previa.append(v)
+            continue
+
+        model += pulp.lpSum(x[j] for j in jornadas_que_cubren) == 1
+
+    # -------------------------------------------------------
+    # 4. Resolver
+    # -------------------------------------------------------
+    solver = pulp.PULP_CBC_CMD(msg=solver_msg)
+    model.solve(solver)
+
+    status = pulp.LpStatus[model.status]
+
+    # -------------------------------------------------------
+    # 5. Resultados
+    # -------------------------------------------------------
+    if status == "Optimal":
+        seleccionadas = [j for j in J if x[j].value() == 1]
+
+        df_sol = df.loc[seleccionadas].copy()
+        df_sol.reset_index(drop=True, inplace=True)
+
+        return {
+            "status": status,
+            "df_solucion": df_sol,
+            "viajes_sin_cubrir": viajes_sin_cobertura_previa,
+            "n_jornadas_seleccionadas": len(seleccionadas)
+        }
+
+    else:
+        viajes_sin_cubrir = []
+        for v in U:
+            if sum(
+                x[j].value() for j in J
+                if v in df.loc[j, "lista_id_viaje"] and x[j].value() is not None
+            ) == 0:
+                viajes_sin_cubrir.append(v)
+
+        return {
+            "status": status,
+            "df_solucion": None,
+            "viajes_sin_cubrir": viajes_sin_cubrir,
+            "n_jornadas_seleccionadas": 0
+        }
