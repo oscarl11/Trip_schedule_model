@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
-import graphviz as graphviz
+#import graphviz as graphviz
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from itertools import combinations
@@ -773,6 +773,7 @@ if st.button("Optimizar jornadas (Set Partitioning)"):
         )
 
         st.dataframe(resultado_part["df_solucion"].head(50))
+
 
 
 
