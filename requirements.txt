@@ -1,7 +1,6 @@
 pandas
 numpy
 streamlit
-graphviz
 matplotlib
 datetime
 itertools
