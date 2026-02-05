@@ -60,3 +60,37 @@ def sel_tramo_incl_Talm(df,Talm_min,Talm_max):
     df_extr_alm=df[~df['lista_id_viaje'].isin(df_subconj_lim_alm['lista_id_viaje'])]
     df_excl_alm=df[df['lista_id_viaje'].isin(df_subconj_lim_alm['lista_id_viaje'])]
     return df_extr_alm,df_excl_alm
+
+
+
+
+def normalizar_df_tramos(df):
+    df = df.copy()
+
+    # ⏱ Fechas
+    for col in ["hora_inicio", "hora_fin"]:
+        df[col] = pd.to_datetime(df[col], dayfirst=True,errors="raise")
+        '''today = pd.Timestamp.today().normalize()  # Obtener fecha de hoy sin hora
+        date_limit=today+timedelta(hours=3)
+        for j in df.index:
+            if df.loc[j,col]<=date_limit:
+                df.loc[j,col]=df.loc[j,col]+timedelta(days=1)
+            else:
+                df.loc[j,col]=df.loc[j,col]'''
+
+    # ⏳ Duración
+    if "duracion" in df.columns:
+        df["duracion"] = pd.to_timedelta(df["duracion"], errors="raise")
+
+    # 🧾 Lista de ids
+    if "lista_id_viaje" in df.columns:
+        df["lista_id_viaje"] = df["lista_id_viaje"].apply(
+            lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+        )
+
+    # 🔢 Asegurar numéricos
+    for col in ["CC", "id_viaje_inicio", "id_viaje_fin"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="raise")
+
+    return df
