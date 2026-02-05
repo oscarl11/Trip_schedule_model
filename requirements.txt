@@ -1,10 +1,5 @@
-pandas
 numpy
 streamlit
 matplotlib
-datetime
-itertools
 pulp
-ast
-zipfile
 psutil
