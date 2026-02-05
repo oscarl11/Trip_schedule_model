@@ -1,12 +1,14 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
-#import graphviz as graphviz
+import graphviz as graphviz
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from itertools import combinations
 import pulp
 import ast
+import zipfile
+import io
 
 from trip_ro import *
 from tramos import *
@@ -31,6 +33,10 @@ if "df_excl_alm" not in st.session_state:
 
 if "df_tramos" not in st.session_state:
     st.session_state.df_tramos = None
+
+if "df_tramos_final" not in st.session_state:
+    st.session_state.df_tramos_final = None
+
 if "df_jornada_partida" not in st.session_state:
     st.session_state.df_jornada_partida = None
 
@@ -250,22 +256,112 @@ if st.button("Generar tramos"):
     df_tramos_2,df_excl_tramo=sel_tramo_incl_Talm(
         df=df_tramos,
         Talm_min=Tlim_alm_min,
-
-
-
         Talm_max=Tlim_alm_max
     )
     st.session_state.df_excl_alm=df_excl_tramo
     st.session_state.df_tramos=df_tramos_2
+    st.success("✅ Tramos generados correctamente")
+
+   
+if (
+    "df_tramos" in st.session_state
+    and st.session_state.df_tramos is not None
+    and "lista_ids_viaje" in st.session_state
+    and st.session_state.lista_ids_viaje is not None
+):
+    # Identificar viajes no incluidos en los tramos generados
+    ids_total = set(st.session_state.lista_ids_viaje['id_viaje'])
+    ids_en_tramos = set(st.session_state.df_tramos['lista_id_viaje'].explode())
+
+    ids_faltantes = sorted(ids_total - ids_en_tramos)
+
+    if ids_faltantes:
+        st.warning(
+            f"Hay {len(ids_faltantes)} viajes que NO están incluidos en los tramos generados."
+        )
+        st.dataframe(pd.DataFrame({'id_viaje_no_incluido': ids_faltantes}))
+    else:
+        st.success("Todos los viajes están cubiertos por los tramos generados.")
+
+    st.write(st.session_state.df_tramos.dtypes)
+    st.write(st.session_state.df_excl_alm.dtypes)
     csv_tramos=st.session_state.df_tramos.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        "Descargar base de tramos de trabajo",
-        csv_tramos,
-        'Tramos_trabajo.csv',
-        'text/csv',
-        key='download-csv-tramos'
+    csv_excl_tram=st.session_state.df_excl_alm.to_csv(index=False).encode('utf-8')
+
+if (
+    "df_tramos" in st.session_state
+    and st.session_state.df_tramos is not None
+    and "df_excl_alm" in st.session_state
+    and st.session_state.df_excl_alm is not None
+):
+    col_d1, col_d2 = st.columns(2)
+    with col_d1:
+        st.download_button(
+            "⬇️ Descargar tramos válidos",
+            st.session_state.df_tramos.to_csv(index=False,sep=";").encode('utf-8'),
+            "Tramos_validos.csv",
+            "text/csv",
+            key="download-tramos-validos"
+        )
+
+    with col_d2:
+        st.download_button(
+            "⬇️ Descargar tramos excluidos (almuerzo)",
+            st.session_state.df_excl_alm.to_csv(index=False,sep=";").encode('utf-8'),
+            "Tramos_excluidos_almuerzo.csv",
+            "text/csv",
+            key="download-tramos-excluidos"
+        )
+    
+st.subheader("Seleccionar base de tramos para continuar")
+st.info(
+    "Si no subes un archivo, el sistema continuará automáticamente "
+    "con los tramos generados por el modelo."
     )
-    st.dataframe(st.session_state.df_tramos.head(20))
+
+# Inicialización segura (una sola vez)
+if "df_tramos_final" not in st.session_state:
+    st.session_state.df_tramos_final = None
+
+archivo_tramos = st.file_uploader(
+        "Sube la base de tramos que deseas usar",
+        type=["csv"]
+    )
+
+# 1️⃣ Caso: el usuario SUBE archivo
+if archivo_tramos is not None:
+    contenido = archivo_tramos.getvalue().decode("utf-8")
+    
+    df_tramos_final = pd.read_csv(io.StringIO(contenido),sep=';',encoding='utf-8')
+    df_tramos_final = normalizar_df_tramos(df_tramos_final)
+    
+    st.session_state.df_tramos_final = df_tramos_final
+
+    st.success("✅ Base de tramos cargada correctamente")
+    st.write(df_tramos_final.dtypes)
+    st.dataframe(df_tramos_final.head(20))
+
+# 2️⃣ Caso: NO sube archivo, pero existen tramos generados
+elif (
+    st.session_state.df_tramos_final is None
+    and "df_tramos" in st.session_state
+    and st.session_state.df_tramos is not None
+):
+    df_tramos_final = st.session_state.df_tramos.copy()
+
+    # Blindaje de lista_id_viaje (flujo automático)
+    if "lista_id_viaje" in df_tramos_final.columns:
+        df_tramos_final["lista_id_viaje"] = df_tramos_final["lista_id_viaje"].apply(
+            lambda x: x if isinstance(x, list) else []
+        )
+
+    st.session_state.df_tramos_final = df_tramos_final
+    st.info("🧠 Usando tramos generados automáticamente")
+
+# 3️⃣ Visualización final (una sola fuente de verdad)
+if st.session_state.df_tramos_final is not None:
+    st.subheader("🧪 Base de tramos utilizada en el pipeline")
+    st.dataframe(st.session_state.df_tramos_final.head(20))
 
 st.divider()
 
@@ -451,8 +547,16 @@ if st.session_state.traslados_validos_ini:
     ]
     st.dataframe(pd.DataFrame(registros_ini))
 
+#Generación de universo de jornadas de trabajo
+
 if st.button("Generar jornadas"):
-    st.session_state.df_jornada_regular=jornadas_regular_eq_est(st.session_state.df_tramos,tmin_jornada,tmax_jornada,tmin_alm,tmax_alm)
+    df_input_tramos = (
+        st.session_state.df_tramos_final
+        if st.session_state.df_tramos_final is not None
+        else st.session_state.df_tramos
+    )
+    
+    st.session_state.df_jornada_regular=jornadas_regular_eq_est(df_input_tramos,tmin_jornada,tmax_jornada,tmin_alm,tmax_alm)
     csv_jornadas_regular=st.session_state.df_jornada_regular.to_csv(index=False).encode('utf-8')
     st.download_button(
         "Descargar base de jornadas de trabajo regulares",
@@ -461,7 +565,7 @@ if st.button("Generar jornadas"):
         'text/csv',
         key='download-csv-REGULAR'
     )
-    st.session_state.df_jornada_partida=jornadas_partido_eq_est(st.session_state.df_tramos,tmin_part_jornada,tmax_part_jornada,max_hora_partido)
+    st.session_state.df_jornada_partida=jornadas_partido_eq_est(df_input_tramos,tmin_part_jornada,tmax_part_jornada,max_hora_partido)
     csv_jornadas_partida=st.session_state.df_jornada_partida.to_csv(index=False).encode('utf-8')
     st.download_button(
         "Descargar base de jornadas de trabajo partida",
@@ -472,7 +576,7 @@ if st.button("Generar jornadas"):
     )
 
     df_jornada_despl=jornadas_regular_diff_est(
-        df_combinaciones=st.session_state.df_tramos,
+        df_combinaciones=df_input_tramos,
         traslados_validos=st.session_state.traslados_validos,
         ESPERA_MIN=tmin_alm,
         ESPERA_MAX=tmax_alm,
@@ -532,6 +636,52 @@ if st.button("Generar jornadas"):
 
     st.dataframe(st.session_state.df_jornada_total.head(50))
 
+st.divider()
+
+col1_1,col2_1=st.columns(2)
+
+with col1_1:
+    T_prom_jornada_reg_h= st.number_input(
+        "Duración promedio jornada regular (horas)",
+        min_value=0,
+        max_value=24,
+        value=8
+    )
+
+with col2_1:
+    T_prom_jornada_reg_m = st.number_input(
+        "Duración promedio jornada regular (minutos)",
+        min_value=0,
+        max_value=59,
+        value=0
+    )
+
+T_prom_jornada_reg = (
+    T_prom_jornada_reg_h + T_prom_jornada_reg_m / 60
+)
+
+
+#-------------------------------------------------------------------------------------------------------------------------------------
+with col1_1:
+    T_prom_jornada_part_h= st.number_input(
+        "Duración promedio jornada partida (horas)",
+        min_value=0,
+        max_value=24,
+        value=9
+    )
+
+with col2_1:
+    T_prom_jornada_part_m = st.number_input(
+        "Duración promedio jornada partida (minutos)",
+        min_value=0,
+        max_value=59,
+        value=15
+    )
+
+T_prom_jornada_part = (
+    T_prom_jornada_part_h + T_prom_jornada_part_m / 60
+)
+
 
 if st.button("Optimizar jornadas (Set Covering)"):
 
@@ -566,6 +716,63 @@ if st.button("Optimizar jornadas (Set Covering)"):
         )
 
         st.dataframe(resultado["df_solucion"].head(50))
+
+
+PARAMS_WEIGHTS = {
+    "costo_base": 1.0,
+
+    # Penalización por tipo de turno
+    "penal_turno_partido": 1.5,   
+    "penal_turno_regular": 0.0,
+
+    # Duraciones objetivo (en horas)
+    "duracion_obj_regular": T_prom_jornada_reg,
+    "duracion_obj_partido": T_prom_jornada_part,
+
+    # Peso de la desviación
+    "lambda_desviacion": 0.8
+}
+
+# Optimización con algoritmo set partitioning con pesos
+
+if st.button("Optimizar jornadas (Set Partitioning)"):
+    st.session_state.df_jornada_total['weight']=st.session_state.df_jornada_total.apply(
+    lambda row: calcular_weight(row, PARAMS_WEIGHTS),
+    axis=1
+    )
+
+    
+    resultado_part = set_weights4schedule(
+        df_id_viajes=st.session_state.lista_ids_viaje,
+        df_jornadas=st.session_state.df_jornada_total,
+        solver_msg=False
+    )
+
+    st.write(f"Estado del modelo: **{resultado_part['status']}**")
+
+    if resultado_part["viajes_sin_cubrir"]:
+        st.warning(
+            f"Viajes sin cobertura previa: {len(resultado_part['viajes_sin_cubrir'])}"
+        )
+        st.dataframe(resultado_part['viajes_sin_cubrir'])
+        
+    if resultado_part["status"] == "Optimal":
+        st.success(
+            f"Jornadas seleccionadas: {resultado_part['n_jornadas_seleccionadas']}"
+        )
+
+        st.session_state.df_solucion = resultado_part["df_solucion"]
+
+        csv_sol = resultado_part["df_solucion"].to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Descargar solución óptima",
+            csv_sol,
+            "solucion_jornadas_scp.csv",
+            "text/csv",
+            key="download-scp-set_cover_sol"
+        )
+
+        st.dataframe(resultado_part["df_solucion"].head(50))
 
 
 
