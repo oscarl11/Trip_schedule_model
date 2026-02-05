@@ -27,6 +27,7 @@ def filtro_ro(df,lista_estaciones):
     df_enc = df.loc[df["hora_fin"].idxmax()]
     return lista_ro,df_sal,df_enc
 
+'''
 def frame_ro(df,lista_estaciones):
     #Extracción del primer punto con PNOR
     lista_perm_PNOR = df[df['estacion_inicio'] == "PNOR"][['id_viaje','CC', 'hora_inicio', 'estacion_inicio']].copy()
@@ -46,3 +47,41 @@ def frame_ro(df,lista_estaciones):
     lista_ro_fin.replace({'estacion_ro':{'NA16':'NARL','NA02':'NARL','NA02':'NARL', 'NA06':'NARL','NA07':'NARL','NA14':'NARL','NA15':'NARL','NA17':'NARL','NA18':'NARL'}},inplace=True)
 
     return lista_ro_fin
+'''
+
+def frame_ro(df,lista_estaciones):
+    #Extracción del primer punto (mínimo hora inicio)
+    idx_ini = df.groupby('CC')['hora_inicio'].idxmin()
+    lista_primer_inicio = (
+        df.loc[idx_ini, ['id_viaje','CC', 'hora_inicio', 'estacion_inicio']]
+          .copy()
+          .rename(columns={
+              'hora_inicio': 'hora_ro',
+              'estacion_inicio': 'estacion_ro'
+          })
+    )
+    #lista_perm_PNOR.rename(columns={'hora_inicio': 'hora_ro', 'estacion_inicio': 'estacion_ro'}, inplace=True)
+    
+    #Extracción de las estaciones de destino presentes en la lista 'estaciones'
+    lista_perm_rest = df[df['estación_fin'].isin(lista_estaciones['estaciones'])& (df['estacion_inicio']!="PNOR")& (df['estación_fin']!="PNOR")][['id_viaje','CC', 'hora_fin', 'estación_fin']].copy()
+    lista_perm_rest.rename(columns={'hora_fin': 'hora_ro', 'estación_fin': 'estacion_ro'}, inplace=True)
+
+    #Extracción del último punto (máximo hora_fin)
+    idx_fin = df.groupby('CC')['hora_fin'].idxmax()
+    lista_ultimo_fin = (
+        df.loc[idx_fin, ['id_viaje','CC', 'hora_fin', 'estación_fin']]
+          .copy()
+          .rename(columns={
+              'hora_fin': 'hora_ro',
+              'estación_fin': 'estacion_ro'
+          })
+    )
+    #lista_PNOR_fin.rename(columns={'hora_fin': 'hora_ro', 'estación_fin': 'estacion_ro'}, inplace=True)
+
+    #Concatenar 3 listas y reemplazo de nombres de estación Naranjal (alimentador)
+    lista_ro = pd.concat([lista_primer_inicio, lista_perm_rest,lista_ultimo_fin], ignore_index=True)
+    lista_ro_fin=lista_ro.sort_values(by=['CC','hora_ro']).drop_duplicates().reset_index(drop=True)
+    lista_ro_fin.replace({'estacion_ro':{'NA16':'NARL','NA02':'NARL','NA02':'NARL', 'NA06':'NARL','NA07':'NARL','NA14':'NARL','NA15':'NARL','NA17':'NARL','NA18':'NARL'}},inplace=True)
+
+    return lista_ro_fin
+
